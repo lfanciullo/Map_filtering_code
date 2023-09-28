@@ -11,8 +11,14 @@ Current content:
     * Noiseless and noisy versions of each
     * Units of Jy/arcsec^2, realistic fluxes for HAWC+ band D (154 um)
 
-### Figures
-Plots of maps or any form of data visualization.
+### Map_figures
 
 Current content:
 * Quiver plots for the three synthetic structures (filament, radially symmetric core, elongated cores + filament), noiseless
+
+### Figures_other
+Other forms of data visualization
+
+Current content:
+* Plots of masks for FFT filtering
+* FFT-filtered maps for one synthetic structure (filament)
