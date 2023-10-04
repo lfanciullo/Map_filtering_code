@@ -12,10 +12,9 @@ folder_maps = 'Map_files/'
 folder_image_results = 'Figures_other/'
 
 mapfile = folder_maps + \
-    'Synthobs_core_nonoise_converted_i+var_Jy-arcs2.fits' # Core, I (no noise), unfiltered
-    #'Synthobs_filament+cores_nonoise_converted_i+var_Jy-arcs2.fits' # Clumps+ilament, I (no noise), unfiltered
+    'Synthobs_filament+cores_nonoise_converted_i+var_Jy-arcs2.fits' # Clumps+ilament, I (no noise), unfiltered
+    #'Synthobs_core_nonoise_converted_i+var_Jy-arcs2.fits' # Core, I (no noise), unfiltered
     #'Synthobs_filament_nonoise_converted_i+var_Jy-arcs2.fits' # Filament, I (no noise), unfiltered
-    #
 
 synthmap = fits.open(mapfile)
 synthmap_data = copy.deepcopy(synthmap[0].data)
