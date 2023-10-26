@@ -7,26 +7,44 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 #from aplpy import FITSFigure
 
+whatpic = 'filament+clumps' # 'filament' # 'core' # 
+convert_units = False
+crop = False
+FFTfilter = False
+cleanedges = False
 
 ### READ MAPS (filtered + unfiltered) ###
 folder_maps = 'Map_files/'
 folder_image_results = 'Figures_other/'
 
-# Original (simulated) data
-mapfile = folder_maps + 'Synthobs_filament_nonoise_converted_i+var_Jy-arcs2.fits'       # Filament, I (no noise), unfiltered
-#mapfile = folder_maps + 'Synthobs_core_nonoise_converted_i+var_Jy-arcs2.fits'           # Core, I (no noise), unfiltered
-#mapfile = folder_maps + 'Synthobs_filament+cores_nonoise_converted_i+var_Jy-arcs2.fits' # Clumps+filament, I (no noise), unfiltered
+# Filenames for original + filtered (simulated) maps:
+if whatpic == 'filament':
+    mapfile = folder_maps + 'Synthobs_filament_nonoise_converted_i+var_Jy-arcs2.fits'  # Filament, I (no noise), unfiltered
+    mapfile_filt = folder_maps + 'Synth_filament_filtered_iext_Jysqa.fits'             # Filament, I (no noise), filtered
+    vmin2use = 1e-3
+    vmax2use = 1e-1
+elif whatpic == 'core':
+    mapfile = folder_maps + 'Synthobs_core_nonoise_converted_i+var_Jy-arcs2.fits'      # Core, I (no noise), unfiltered
+    print('Filtered core image: WIP')
+    vmin2use = 2.
+    vmax2use = 1e-2
+elif whatpic == 'filament+clumps':
+    mapfile = folder_maps + 'Synthobs_filament+cores_nonoise_converted_i+var_Jy-arcs2.fits' # Clumps+filament, I (no noise), unfiltered
+    mapfile_filt = folder_maps + 'Synth_filament+cores_filtered_iext_filtered_model.fits'   # Clumps+filament, I (no noise), filtered
+    vmin2use = 2.
+    vmax2use = 1e-2
+else:
+    print('WARNING: picture mode ', whatpic, ' not recognized.')
+
+# Read
 synthmap = fits.open(mapfile)
 synthmap_data = copy.deepcopy(synthmap[0].data)
 wcs = WCS(synthmap[0].header)
-
-# Data filtered with POL-2 pipeline
-# To add: core
-mapfile_filt = folder_maps + 'Synth_filament_filtered_iext_Jysqa.fits' # Filament, I (no noise), filtered
-#mapfile_filt = folder_maps + 'Synth_filament+cores_filtered_iext_filtered_model.fits' # Clumps+filament, I (no noise), filtered
 synthmap_filt = fits.open(mapfile_filt)
 synthmap_filt_data = copy.deepcopy(np.squeeze(synthmap_filt[0].data))
 wcs_filt = WCS(synthmap_filt[0].header).dropaxis(2)  # Dropping shallow 3rd axis
+if convert_units:
+    synthmap_filt_data *= 2795
 
 
 ### PREPARE DATA ###
@@ -34,18 +52,30 @@ wcs_filt = WCS(synthmap_filt[0].header).dropaxis(2)  # Dropping shallow 3rd axis
 # NOTA: Need to edit WCS for proper coordinates in plot
 nside_init = 273                         # Size of original (unfiltered) FITS image
 nside_init_filt = 267                    # Size of filtered FITS image
-nside = 151                              # Size of region selected for analysis
-#image = synthmap_data[0:nside,0:nside]
-image = synthmap_data[int((nside_init-nside)/2):int(nside+(nside_init-nside)/2),  # Select square region
-                      int((nside_init-nside)/2):int(nside+(nside_init-nside)/2)]
-image_filt = synthmap_filt_data[int((nside_init_filt-nside)/2):int(nside+(nside_init_filt-nside)/2),  # Select square region
-                                int((nside_init_filt-nside)/2):int(nside+(nside_init_filt-nside)/2)]
+nside = 131                              # Size of region selected for analysis
+if crop:
+    image = synthmap_data[int((nside_init-nside)/2):int(nside+(nside_init-nside)/2),  # Select square region
+                          int((nside_init-nside)/2):int(nside+(nside_init-nside)/2)]
+    image_filt = synthmap_filt_data[int((nside_init_filt-nside)/2):int(nside+(nside_init_filt-nside)/2),  # Select square region
+                                    int((nside_init_filt-nside)/2):int(nside+(nside_init_filt-nside)/2)]
+else:
+    image = synthmap_data[0:nside_init,0:nside_init]
+    image_filt = synthmap_filt_data[0:nside_init_filt,0:nside_init_filt]
+
 #image[np.where(~np.isfinite(image))] = 0. # Get rid of NaNs
+
 # Some relevant numbers:
 #   Pixel size: 3.4 arcsec (synthmap[0].header['CDELT1']*3600)
 #   Map size: 273 * 3.4 ~ 928 arcsec
+#             267 * 3.4 ~ 908 arcsec
 #   180" scale ~ map size / 5
 
+x, y = np.meshgrid(np.arange(nside), np.arange(nside))     # Create array of "distance" from center (--> frequencies)
+dist = np.sqrt((x-int(nside/2))**2 + (y-int(nside/2))**2)
+if cleanedges:
+    width = 20  # Half-width
+    filt_edges = exp(-((x-nside/2)/width)**4)
+    image_filt *= filt_edges
 
 ### Fourier transforms ###
 fourier_image = np.fft.fft2(image)                      # FFT
@@ -63,8 +93,6 @@ max_deviation_filt = np.max(np.angle(reconstructed_image_filt[where(image_filt !
 print('Max deviation in inverse FFT (original image) = ', max_deviation)
 print('Max deviation in inverse FFT (original image) = ', max_deviation_filt)
 
-x, y = np.meshgrid(np.arange(nside), np.arange(nside))     # Create array of "distance" from center (--> frequencies)
-dist = np.sqrt((x-int(nside/2))**2 + (y-int(nside/2))**2)
 
 # Filters
 filtsize = 3. #5.
@@ -80,9 +108,10 @@ filt_quartic = 1 - exp(-(dist/filtsize)**4) * (1-floor)
 #cbar.set_label('Distance (pixels)', size = 'large')
 #plt.contour(filt_boxcar[range_min:range_max, range_min:range_max], [.1, .5, .9], colors = 'k')
 
-fourier_image_shifted *= filt_boxcar                     # Manually eliminating large scales
-image_FFTfiltered = np.fft.ifft2(fourier_image_shifted)  # Inverse Fourier transform --> FFT-filtered image
-
+if FFTfilter:
+    fourier_image_shifted *= filt_boxcar                     # Manually eliminating large scales
+    image_FFTfiltered = np.fft.ifft2(fourier_image_shifted)  # Inverse Fourier transform --> FFT-filtered image
+    
 #kfreq = np.fft.fftfreq(nside) * nside
 
 
@@ -90,23 +119,28 @@ image_FFTfiltered = np.fft.ifft2(fourier_image_shifted)  # Inverse Fourier trans
 
 # Plot original image
 #wcs = WCS(synthmap[0].header)
-plt.subplot(projection = wcs)
-plt.imshow(image, cmap = 'rainbow', norm = colors.LogNorm(vmin = 1e-2, vmax = 2.))
+plt.subplot() #(projection = wcs) #
+plt.imshow(image, cmap = 'rainbow', norm = colors.LogNorm(vmin = vmin2use, vmax = vmax2use))
 #plt.imshow(image/np.nanmax(image), cmap = 'rainbow', norm = colors.LogNorm(vmin = 1e-2, vmax = 1.)) # Normalized version
-plt.xlabel('RA (J2000)', fontsize = 'large')
-plt.ylabel('Dec (J2000)', fontsize = 'large')
+#plt.xlabel('RA (J2000)', fontsize = 'large')
+#plt.ylabel('Dec (J2000)', fontsize = 'large')
 cbar = plt.colorbar()
-cbar.set_label('Intensity', size = 'large')
+cbar.set_label('Intensity (Jy / arcsec$^2$)', size = 'large')
 #plt.savefig(folder_image_results + 'Image_orig.png')
 
 # Filtered / unfiltered ratio
+ratio = image_filt/image
+vmin_ratio = 0.
+vmax_ratio = 1. # .08 # 
+contours = [.1, .3, .5, .7] # [.02, .04, .06] # 
 plt.subplot()
 plt.title('$I$ ratio for filament (filtered/unfiltered)', size = 'x-large')
-plt.imshow(image_filt/image, cmap = 'viridis')#, norm = colors.LogNorm(vmin = 1e-2, vmax = 2.))
+plt.imshow(ratio, cmap = 'viridis', vmin = vmin_ratio, vmax = vmax_ratio)
 cbar = plt.colorbar()
 cbar.set_label('Ratio', size = 'large')
+cont = plt.contour(ratio, contours, colors = 'white', inline = True)
+plt.clabel(cont, inline = True)
 #plt.savefig(folder_image_results + 'Image_ratio.png')
-
 
 # Plot Fourier amplitude
 fourier_amplitudes = np.abs(fourier_image_shifted)**2
@@ -121,6 +155,30 @@ cbar.set_label('Fourier amplitude', size = 'large')
 #cbar.set_label('Fourier amplitude ratio: filtered/unfiltered', size = 'large') # Ratio
 #cbar.set_label('Fourier amplitude (normalized)', size = 'large') # Normalized
 #plt.savefig(folder_image_results + 'Image_FFT-amplitudes_shifted.png')
+
+# testing orders of magnitude:
+# fourier_amplitudes[63:68,63:68]/fourier_amplitudes_filt[63:68,63:68]
+
+"""
+width = 20  # Half-width
+filt_edges = exp(-((x-nside/2)/width)**4)
+image_filt_noedge = image_filt * filt_edges
+fourier_image_filt_noedge = np.fft.fft2(image_filt_noedge)
+fourier_image_filt_noedge_shifted = np.fft.fftshift(fourier_image_filt_noedge)
+fourier_amplitudes_filt_noedge = np.abs(fourier_image_filt_noedge_shifted)**2
+
+# Fourier amplitude slice (defined for filament)
+plt.plot(fourier_amplitudes[75,75:151], label = 'Original')
+plt.plot(fourier_amplitudes_filt[75,75:151], label = 'Filtered')
+#plt.plot(np.flipud(fourier_amplitudes[75,0:76]))      # Just to check symmetry
+#plt.plot(np.flipud(fourier_amplitudes_filt[75,0:76])) # Ditto
+plt.yscale('log')
+plt.title('FFT of synthetic filament (slice)', fontsize = 'x-large')
+plt.xlabel(r'Distance from center (pixels)', fontsize = 'x-large')
+plt.ylabel(r'Amplitude', fontsize = 'x-large')
+plt.legend()
+"""
+
 
 # Plot inverse Fourier transform
 data2plot = \
