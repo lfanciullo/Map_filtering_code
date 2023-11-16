@@ -1,0 +1,107 @@
+#!/bin/tcsh
+
+# Need to start with the synthetic maps in the directory as well as fits files of I Q and U of Serpens empty field and the python files py1.py and py2.py 
+
+star21A
+smurf
+polpack
+convert
+kappa
+cupid
+
+# these were determined by comparing max I values in Stokes I and min/max values in Stokes Q, U between Serp and synthetic maps
+set scale1=1000
+set scale2=100
+set scale3=10
+
+# Just starting my python environment
+python39
+
+# Part 1
+
+python py1.py Synthobs_core_noisy_converted_i+var_Jy-arcs2.fits Synthobs_core_noisy_converted_q+var_Jy-arcs2.fits Synthobs_core_noisy_converted_u+var_Jy-arcs2.fits $scale1 $scale2 $scale3
+
+fits2ndf in=Synthobs_i_sc.fits out=Synthobs_i_sc.sdf
+fits2ndf in=Synthobs_q_sc.fits out=Synthobs_q_sc.sdf
+fits2ndf in=Synthobs_u_sc.fits out=Synthobs_u_sc.sdf
+fits2ndf in=Synthobs_ivar_sc.fits out=Synthobs_ivar_sc.sdf
+fits2ndf in=Synthobs_qvar_sc.fits out=Synthobs_qvar_sc.sdf
+fits2ndf in=Synthobs_uvar_sc.fits out=Synthobs_uvar_sc.sdf
+
+sqorst Synthobs_i_sc.sdf ifake_4as mode=pixelscale method=near centre=origin pixscale="'4,4,*'"
+sqorst Synthobs_q_sc.sdf qfake_4as mode=pixelscale method=near centre=origin pixscale="'4,4,*'"
+sqorst Synthobs_u_sc.sdf ufake_4as mode=pixelscale method=near centre=origin pixscale="'4,4,*'"
+sqorst Synthobs_ivar_sc.sdf ivarfake_4as mode=pixelscale method=near centre=origin pixscale="'4,4,*'"
+sqorst Synthobs_qvar_sc.sdf qvarfake_4as mode=pixelscale method=near centre=origin pixscale="'4,4,*'"
+sqorst Synthobs_uvar_sc.sdf uvarfake_4as mode=pixelscale method=near centre=origin pixscale="'4,4,*'"
+
+wcsalign Synthobs_i_sc.sdf lbnd=! out=ifake_4as_final ref=ifake_4as conserve=no method=sincsinc params=\[2,0\] rebin=yes
+wcsalign Synthobs_q_sc.sdf lbnd=! out=qfake_4as_final ref=qfake_4as conserve=no method=sincsinc params=\[2,0\] rebin=yes
+wcsalign Synthobs_u_sc.sdf lbnd=! out=ufake_4as_final ref=ufake_4as conserve=no method=sincsinc params=\[2,0\] rebin=yes
+wcsalign Synthobs_ivar_sc.sdf lbnd=! out=ivarfake_4as_final ref=ivarfake_4as conserve=no method=sincsinc params=\[2,0\] rebin=yes
+wcsalign Synthobs_qvar_sc.sdf lbnd=! out=qvarfake_4as_final ref=qvarfake_4as conserve=no method=sincsinc params=\[2,0\] rebin=yes
+wcsalign Synthobs_uvar_sc.sdf lbnd=! out=uvarfake_4as_final ref=uvarfake_4as conserve=no method=sincsinc params=\[2,0\] rebin=yes
+
+ndf2fits ifake_4as_final.sdf ifake_4as_final.fits
+ndf2fits qfake_4as_final.sdf qfake_4as_final.fits
+ndf2fits ufake_4as_final.sdf ufake_4as_final.fits
+ndf2fits ivarfake_4as_final.sdf ivarfake_4as_final.fits
+ndf2fits qvarfake_4as_final.sdf qvarfake_4as_final.fits
+ndf2fits uvarfake_4as_final.sdf uvarfake_4as_final.fits
+
+python py2.py
+
+fits2ndf in=fakei_trans_pW_sc_4as_al.fits out=fakei_trans_pW_sc_4as_al.sdf
+fits2ndf in=fakeq_trans_pW_sc_4as_al.fits out=fakeq_trans_pW_sc_4as_al.sdf
+fits2ndf in=fakeu_trans_pW_sc_4as_al.fits out=fakeu_trans_pW_sc_4as_al.sdf
+
+
+
+# Part 2
+setenv qudir /san/stellar/jkaroly/Serpens_Empty/qudata/
+
+echo "numiter=-1500" > iconf_filcore.lis
+echo "fakemap=fakei_trans_pW_sc_4as_al.sdf" >> iconf_filcore.lis
+echo "numiter=-1500" > qconf_filcore.lis
+echo "fakemap=fakeq_trans_pW_sc_4as_al.sdf" >> qconf_filcore.lis
+echo "numiter=-1500" > uconf_filcore.lis
+echo "fakemap=fakeu_trans_pW_sc_4as_al.sdf" >> uconf_filcore.lis
+
+mkdir maps
+
+pol2map in=$qudir\*_IT.sdf iout=iauto qout=! uout=! mapdir=maps mapvar=no config=^iconf_filcore.lis
+pol2map in=$qudir\*_IT.sdf iout=iext qout=! uout=! mapdir=maps mask=iauto maskout1=astmask maskout2=pcamask cat=! skyloop=yes mapvar=yes config=^iconf_filcore.lis logfile=pol2map_stokesI.log
+pol2map in=$qudir\*_QT.sdf iout=! qout=qext uout=! mapdir=maps mask="'astmask,pcamask'" masktype=mask cat=! skyloop=yes mapvar=yes config=^qconf_filcore.lis logfile=pol2map_stokesQ.log ipcor=no
+pol2map in=$qudir\*_UT.sdf iout=! qout=! uout=uext mapdir=maps mask="'astmask,pcamask'" masktype=mask cat=! skyloop=yes mapvar=yes config=^uconf_filcore.lis logfile=pol2map_stokesU.log ipcor=no
+
+sub iext iext_serpens iext_synthonly
+sub qext qext_serpens qext_synthonly
+sub uext uext_serpens uext_synthonly
+
+# This multiplies variance array as well correctly
+cmult in=iext_synthonly scalar=$scale1 out=iext_synthonly_tmp
+cmult in=qext_synthonly scalar=$scale2 out=qext_synthonly_tmp
+cmult in=uext_synthonly scalar=$scale3 out=uext_synthonly_tmp
+
+cmult in=iext_synthonly_tmp scalar=2.795 out=iext_synthonly_Jy-arcs2
+cmult in=qext_synthonly_tmp scalar=2.795 out=qext_synthonly_Jy-arcs2
+cmult in=uext_synthonly_tmp scalar=2.795 out=uext_synthonly_Jy-arcs2
+
+rm iext_synthonly_tmp.sdf qext_synthonly_tmp.sdf uext_synthonly_tmp.sdf
+
+setunits iext_synthonly_Jy-arcs2.sdf units="Jy/arcsec2"
+setunits qext_synthonly_Jy-arcs2.sdf units="Jy/arcsec2"
+setunits uext_synthonly_Jy-arcs2.sdf units="Jy/arcsec2"
+
+mkdir final_maps
+cp *ext_synthonly_Jy-arcs2.sdf final_maps
+pol2map in=final_maps/\* iout=! qout=! uout=! cat=vec_cat_synthonly_4as_debmas glevel=None debias=yes debiastype=mas
+pol2map in=final_maps/\* iout=! qout=! uout=! cat=vec_cat_synthonly_bin12_debmas glevel=None binsize=12 debias=yes debiastype=mas
+
+ndf2fits iext_synthonly_Jy-arcs2.sdf iext_synthonly_Jy-arcs2.fits
+ndf2fits qext_synthonly_Jy-arcs2.sdf qext_synthonly_Jy-arcs2.fits
+ndf2fits uext_synthonly_Jy-arcs2.sdf uext_synthonly_Jy-arcs2.fits
+
+
+
+
