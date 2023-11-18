@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 #from aplpy import FITSFigure
 
-whatpic = 'filament+clumps' # 'filament' # 'core' # 
-convert_units = False
+whatpic = 'core' # 'filament+clumps' # 'filament' # 
+convert_units = True
 crop = False
 FFTfilter = False
 cleanedges = False
@@ -25,7 +25,8 @@ if whatpic == 'filament':
     vmax2use = 1e-1
 elif whatpic == 'core':
     mapfile = folder_maps + 'Synthobs_core_nonoise_converted_i+var_Jy-arcs2.fits'      # Core, I (no noise), unfiltered
-    print('Filtered core image: WIP')
+    #mapfile_filt = folder_maps + 'Synth_core_filtered_iext.fits'                       # Core, I (no noise), filtered
+    mapfile_filt = folder_maps + 'Synth_core_filtered+subtracted_iext.fits'            # Core, I (no noise), filtered + Serpens-cleaned
     vmin2use = 2.
     vmax2use = 1e-2
 elif whatpic == 'filament+clumps':
@@ -44,7 +45,7 @@ synthmap_filt = fits.open(mapfile_filt)
 synthmap_filt_data = copy.deepcopy(np.squeeze(synthmap_filt[0].data))
 wcs_filt = WCS(synthmap_filt[0].header).dropaxis(2)  # Dropping shallow 3rd axis
 if convert_units:
-    synthmap_filt_data *= 2795
+    synthmap_filt_data *= 2795  # For I map. May be different for Q, U maps
 
 
 ### PREPARE DATA ###
@@ -122,6 +123,7 @@ if FFTfilter:
 plt.subplot() #(projection = wcs) #
 plt.imshow(image, cmap = 'rainbow', norm = colors.LogNorm(vmin = vmin2use, vmax = vmax2use))
 #plt.imshow(image/np.nanmax(image), cmap = 'rainbow', norm = colors.LogNorm(vmin = 1e-2, vmax = 1.)) # Normalized version
+#plt.title('Synthetic core map\n(Processed)', fontsize = 'xx-large')
 #plt.xlabel('RA (J2000)', fontsize = 'large')
 #plt.ylabel('Dec (J2000)', fontsize = 'large')
 cbar = plt.colorbar()
