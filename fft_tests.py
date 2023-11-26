@@ -7,11 +7,12 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 #from aplpy import FITSFigure
 
-whatpic = 'core' # 'filament+clumps' # 'filament' # 
-convert_units = True
-crop = False
+whatpic = 'filament' # 'core' # 'filament+clumps' # 
+convert_units = False
+crop = True
+windowing = False
 FFTfilter = False
-cleanedges = False
+
 
 ### READ MAPS (filtered + unfiltered) ###
 folder_maps = 'Map_files/'
@@ -73,11 +74,22 @@ else:
 
 x, y = np.meshgrid(np.arange(nside), np.arange(nside))     # Create array of "distance" from center (--> frequencies)
 dist = np.sqrt((x-int(nside/2))**2 + (y-int(nside/2))**2)
-if cleanedges:
+if windowing:
+    from skimage.filters import window
+    hann = window('hann', image.shape)
+    image_filt *= hann
+    plt.subplot()
+    plt.title('2D Hann window', size = 'x-large')
+    plt.imshow(hann, cmap = 'bone', vmin = 0., vmax = 1.)
+    cbar = plt.colorbar()
+    #plt.savefig(folder_image_results + 'Window_Hann.png')
+    '''
+    # Old
     width = 20  # Half-width
     filt_edges = exp(-((x-nside/2)/width)**4)
     image_filt *= filt_edges
-
+    '''
+    
 ### Fourier transforms ###
 fourier_image = np.fft.fft2(image)                      # FFT
 fourier_image_shifted = np.fft.fftshift(fourier_image)  # Shift --> low spatial frequencies now at the center of the image
@@ -162,23 +174,29 @@ cbar.set_label('Fourier amplitude', size = 'large')
 # fourier_amplitudes[63:68,63:68]/fourier_amplitudes_filt[63:68,63:68]
 
 """
-width = 20  # Half-width
-filt_edges = exp(-((x-nside/2)/width)**4)
-image_filt_noedge = image_filt * filt_edges
-fourier_image_filt_noedge = np.fft.fft2(image_filt_noedge)
-fourier_image_filt_noedge_shifted = np.fft.fftshift(fourier_image_filt_noedge)
-fourier_amplitudes_filt_noedge = np.abs(fourier_image_filt_noedge_shifted)**2
+#width = 20  # Half-width
+#filt_edges = exp(-((x-nside/2)/width)**4)
+#image_filt_window = image_filt * filt_edges
+from skimage.filters import window
+hann = window('hann', image.shape)
+image_filt_window = image_filt * hann
+fourier_image_filt_window = np.fft.fft2(image_filt_window)
+fourier_image_filt_window_shifted = np.fft.fftshift(fourier_image_filt_window)
+fourier_amplitudes_filt_window = np.abs(fourier_image_filt_window_shifted)**2
 
 # Fourier amplitude slice (defined for filament)
-plt.plot(fourier_amplitudes[75,75:151], label = 'Original')
-plt.plot(fourier_amplitudes_filt[75,75:151], label = 'Filtered')
-#plt.plot(np.flipud(fourier_amplitudes[75,0:76]))      # Just to check symmetry
-#plt.plot(np.flipud(fourier_amplitudes_filt[75,0:76])) # Ditto
+plt.plot(fourier_amplitudes[65,65:131], label = 'Original')
+plt.plot(fourier_amplitudes_filt[65,65:131], label = 'Filtered')
+plt.plot(fourier_amplitudes_filt_window[65,65:131], label = 'Filtered + window')
+#plt.plot(np.flipud(fourier_amplitudes[65,0:66]))      # Just to check symmetry
+#plt.plot(np.flipud(fourier_amplitudes_filt[65,0:66])) # Ditto
+plt.xlim(0, 65)
 plt.yscale('log')
 plt.title('FFT of synthetic filament (slice)', fontsize = 'x-large')
 plt.xlabel(r'Distance from center (pixels)', fontsize = 'x-large')
 plt.ylabel(r'Amplitude', fontsize = 'x-large')
 plt.legend()
+#plt.savefig(folder_image_results + 'FFT1D_Imap_crop131.png')
 """
 
 
